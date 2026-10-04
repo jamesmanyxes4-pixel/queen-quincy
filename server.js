@@ -213,17 +213,6 @@ const html = `<!DOCTYPE html>
   .destiny-quote .em { color: var(--rose); font-style: normal; }
 
   /* ---------- music ---------- */
-  .music-pill {
-    position: fixed; top: 18px; right: 18px; z-index: 40;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 11px; letter-spacing: .26em; text-transform: uppercase; text-indent: .26em;
-    color: #fff; background: rgba(0,0,0,.5);
-    border: 1px solid rgba(255,255,255,.35);
-    padding: 11px 18px; border-radius: 999px; cursor: pointer;
-    backdrop-filter: blur(6px); display: none;
-  }
-  .music-pill.on { display: block; border-color: rgba(255,79,139,.7); box-shadow: 0 0 18px rgba(255,79,139,.3); }
-
   /* ---------- her full-screen video moment ---------- */
   #herMoment {
     height: 100vh;
@@ -305,7 +294,6 @@ const html = `<!DOCTYPE html>
   <div class="cursor-glow" id="cglow"></div>
   <div id="floaters"></div>
 
-  <button class="music-pill" id="musicBtn">♪&nbsp;&nbsp;Play music</button>
   <audio id="dateSong" src="/date_song.mp3" loop preload="none"></audio>
 
   <!-- GATE -->
@@ -408,7 +396,7 @@ const html = `<!DOCTYPE html>
     const g = document.getElementById('gate');
     g.classList.add('hide');
     document.body.classList.remove('locked');
-    document.getElementById('musicBtn').classList.add('on');
+    musicWanted = true; songPlay();
     setTimeout(() => g.remove(), 1500);
   });
 
@@ -493,11 +481,9 @@ const html = `<!DOCTYPE html>
   herPlay.addEventListener('click', () => {
     herV.muted = false;
     herV.play().catch(()=>{});
-    herPlay.innerHTML = '♪&nbsp;&nbsp;Music on';
   });
   herV.addEventListener('click', () => {
     herV.muted = !herV.muted;
-    herPlay.innerHTML = herV.muted ? '♪&nbsp;&nbsp;Tap for music' : '♪&nbsp;&nbsp;Music on';
   });
   new IntersectionObserver((es) => es.forEach((en) => {
     if (!en.isIntersecting && !herV.paused) herV.pause();
@@ -506,7 +492,6 @@ const html = `<!DOCTYPE html>
 
   /* ---------- real romantic song (Pixabay: Soulful Serenade, free for any use) ---------- */
   const song = document.getElementById('dateSong');
-  const musicBtn = document.getElementById('musicBtn');
   let musicWanted = false;
 
   function songPlay() {
@@ -523,17 +508,6 @@ const html = `<!DOCTYPE html>
       if (song.volume <= 0) { clearInterval(f); song.pause(); }
     }, 80);
   }
-  musicBtn.addEventListener('click', () => {
-    musicWanted = !musicWanted;
-    if (musicWanted) {
-      songPlay();
-      musicBtn.innerHTML = '♪&nbsp;&nbsp;Music on';
-      musicBtn.classList.add('on');
-    } else {
-      songStop();
-      musicBtn.innerHTML = '♪&nbsp;&nbsp;Play music';
-    }
-  });
 
   /* video sound priority: song ducks when her video is unmuted */
   function duckCheck() {
