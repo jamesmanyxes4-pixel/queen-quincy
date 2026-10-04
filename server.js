@@ -306,6 +306,7 @@ const html = `<!DOCTYPE html>
   <div id="floaters"></div>
 
   <button class="music-pill" id="musicBtn">♪&nbsp;&nbsp;Play music</button>
+  <audio id="dateSong" src="/date_song.mp3" loop preload="none"></audio>
 
   <!-- GATE -->
   <section id="gate">
@@ -503,47 +504,49 @@ const html = `<!DOCTYPE html>
     else if (en.isIntersecting && !herV.muted && herV.paused) herV.play().catch(()=>{});
   }), {threshold:.4}).observe(herV);
 
-  /* ---------- music (generated soft piano-ish tones, no autoplay) ---------- */
-  let ac = null, musicOn = false, gain = null, loopTimer = null;
+  /* ---------- real romantic song (Pixabay: Soulful Serenade, free for any use) ---------- */
+  const song = document.getElementById('dateSong');
   const musicBtn = document.getElementById('musicBtn');
-  const notes = [261.63, 329.63, 392.0, 523.25, 392.0, 329.63]; // C E G C' G E — soft arpeggio
-  function playNote(freq, when, dur, vol) {
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = 'sine'; o.frequency.value = freq;
-    g.gain.setValueAtTime(0, when);
-    g.gain.linearRampToValueAtTime(vol, when + dur*.25);
-    g.gain.exponentialRampToValueAtTime(.0001, when + dur);
-    o.connect(g); g.connect(gain);
-    o.start(when); o.stop(when + dur + .05);
+  let musicWanted = false;
+
+  function songPlay() {
+    song.volume = 0;
+    song.play().catch(()=>{});
+    const f = setInterval(() => {
+      song.volume = Math.min(1, song.volume + .04);
+      if (song.volume >= 1) clearInterval(f);
+    }, 80);
   }
-  function scheduleLoop() {
-    let t = ac.currentTime + .1;
-    for (let b = 0; b < 4; b++) {
-      notes.forEach((n, i) => {
-        playNote(n, t + b*2.4 + i*.3, 2.2, .055);
-        if (i === 0) playNote(n/2, t + b*2.4, 2.6, .04); // soft bass
-      });
-    }
-    loopTimer = setTimeout(() => { if (musicOn) scheduleLoop(); }, 9600);
+  function songStop() {
+    const f = setInterval(() => {
+      song.volume = Math.max(0, song.volume - .08);
+      if (song.volume <= 0) { clearInterval(f); song.pause(); }
+    }, 80);
   }
   musicBtn.addEventListener('click', () => {
-    if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); gain = ac.createGain(); gain.connect(ac.destination); }
-    if (ac.state === 'suspended') ac.resume();
-    musicOn = !musicOn;
-    if (musicOn) {
-      gain.gain.setValueAtTime(0, ac.currentTime);
-      gain.gain.linearRampToValueAtTime(1, ac.currentTime + 2);   // fade in
-      scheduleLoop();
+    musicWanted = !musicWanted;
+    if (musicWanted) {
+      songPlay();
       musicBtn.innerHTML = '♪&nbsp;&nbsp;Music on';
       musicBtn.classList.add('on');
     } else {
-      gain.gain.cancelScheduledValues(ac.currentTime);
-      gain.gain.setValueAtTime(gain.gain.value, ac.currentTime);
-      gain.gain.linearRampToValueAtTime(0, ac.currentTime + 1.5); // fade out
-      clearTimeout(loopTimer);
+      songStop();
       musicBtn.innerHTML = '♪&nbsp;&nbsp;Play music';
     }
   });
+
+  /* video sound priority: song ducks when her video is unmuted */
+  function duckCheck() {
+    const videoLoud = !herV.muted && !herV.paused;
+    if (videoLoud && !song.paused) songStop();
+    else if (!videoLoud && musicWanted && song.paused) songPlay();
+  }
+  herV.addEventListener('unmute', duckCheck);
+  herV.addEventListener('play', duckCheck);
+  herV.addEventListener('pause', duckCheck);
+  // 'unmute' isn't a real event; watch muted flips via a tiny poll
+  let lastMuted = herV.muted;
+  setInterval(() => { if (herV.muted !== lastMuted) { lastMuted = herV.muted; duckCheck(); } }, 400);
 </script>
 </body>
 </html>`;
@@ -552,6 +555,24 @@ const PUB = path.join(path.dirname(new URL(import.meta.url).pathname), "public")
 
 const server = http.createServer((req, res) => {
   const url = (req.url || "/").split("?")[0];
+  if (url === "/date_song.mp3") {
+    const f = path.join(PUB, "date_song.mp3");
+    if (existsSync(f)) {
+      const range = req.headers.range;
+      const size = statSync(f).size;
+      if (range) {
+        const m = range.match(/bytes=(\\d+)-(\\d*)/);
+        const start = m ? parseInt(m[1], 10) : 0;
+        const end = m && m[2] ? Math.min(parseInt(m[2], 10), size - 1) : size - 1;
+        res.writeHead(206, { "content-type": "audio/mpeg", "accept-ranges": "bytes", "content-range": "bytes " + start + "-" + end + "/" + size, "content-length": end - start + 1 });
+        createReadStream(f, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, { "content-type": "audio/mpeg", "accept-ranges": "bytes", "content-length": size });
+        createReadStream(f).pipe(res);
+      }
+    } else { res.writeHead(404); res.end(); }
+    return;
+  }
   if (url === "/queen_video.mp4") {
     const f = path.join(PUB, "queen_video.mp4");
     if (existsSync(f)) {
